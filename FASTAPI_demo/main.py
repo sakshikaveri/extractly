@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from models import Product
+from config import session
 
 app = FastAPI()
 
@@ -18,6 +19,13 @@ products = [
 # to fetch all products, GET request
 @app.get("/products")    #use localhost:8000/docs- for swagger (to execute within an inbuilt ui provided by fastapi)
 def get_products():
+    
+    #db_connection
+    db = session()
+    
+    
+    #query
+    
     return products
 
 # to fetch product by id
