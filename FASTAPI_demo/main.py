@@ -75,11 +75,11 @@ def update_product(id:int,product:Product,db: Session = Depends(get_db)):
 
 # to delete a product , DELETE request
 @app.delete("/products")
-def delete_product(id:int):
-    for i in range(len(products)):
-        if products[i].id==id:
-            del products[i]
-            
-            return "Product deleted succesfully"
+def delete_product(id:int, db: Session = Depends(get_db)):
+    db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
+    if db_product:
+        db.delete(db_product)
+        db.commit() 
+        return "Product deleted succesfully"
     
     return "Product not found"
