@@ -54,18 +54,22 @@ def get_product_byID(id:int, db: Session = Depends(get_db)):
 
 # to add a product, POST request
 @app.post("/products")
-def add_product(product:Product):
-    products.append(product)
-    return product
+def add_product(product:Product, db: Session = Depends(get_db)):
+    db_product = db.add(database_models.Product(**product.model_dump()))
+    db.commit()
+    return db_product
 
 # to update a product , PUT request
 @app.put("/products")
-def update_product(id:int,product:Product):
-    for i in range(len(products)):
-        if products[i].id==id:
-            products[i]=product
-            
-            return "Record updated succesfully"
+def update_product(id:int,product:Product,db: Session = Depends(get_db)):
+    db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
+    if db_product:
+        db_product.name=product.name
+        db_product.description=product.description
+        db_product.price=product.price
+        db_product.quantity=product.quantity
+        db.commit()  
+        return "Record updated succesfully"
     
     return "Product not found"
 
