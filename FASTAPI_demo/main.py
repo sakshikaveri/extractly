@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from models import Product
-from config import session
+from config import session,engine
+import database_models
 
 app = FastAPI()
 
+database_models.Base.metadata.create_all(bind=engine)
 # to return a output for server start
 @app.get("/")
 def greet_user():
@@ -22,10 +24,8 @@ def get_products():
     
     #db_connection
     db = session()
-    
-    
     #query
-    
+    db.query()
     return products
 
 # to fetch product by id
