@@ -4,7 +4,16 @@ from config import session,engine
 import database_models
 from sqlalchemy.orm import Session
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+# for connectinf backend and server, to configure different port running backend frontend
+app.add_middleware (
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"]
+)
 
 database_models.Base.metadata.create_all(bind=engine)
 # to return a output for server start
@@ -60,7 +69,7 @@ def add_product(product:Product, db: Session = Depends(get_db)):
     return db_product
 
 # to update a product , PUT request
-@app.put("/products")
+@app.put("/products/{id}")
 def update_product(id:int,product:Product,db: Session = Depends(get_db)):
     db_product = db.query(database_models.Product).filter(database_models.Product.id == id).first()
     if db_product:
