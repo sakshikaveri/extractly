@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from models import Product
 from config import session,engine
 import database_models
+from sqlalchemy.orm import Session
 
 app = FastAPI()
 
@@ -18,6 +19,14 @@ products = [
     Product(id=8, name="Table", description="A wooden table", price=199.99, quantity=20),
 ]
 
+# // to provide session via dependancy injection to different tasks
+def get_db():
+    db=session()
+    try:
+        yield db
+    finally:
+        db.close()
+
 #  to add the products in the db
 def init_db():
     db=session();
@@ -31,13 +40,9 @@ init_db()
 
 # to fetch all products, GET request
 @app.get("/products")    #use localhost:8000/docs- for swagger (to execute within an inbuilt ui provided by fastapi)
-def get_products():
-    
-    #db_connection
-    # db = session()
-    # #query
-    # db.query()
-    return products
+def get_products(db: Session = Depends(get_db)):
+    db_products = db.query(database_models.Product).all()
+    return db_products
 
 # to fetch product by id
 @app.get("/products/{id}")
