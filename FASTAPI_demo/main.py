@@ -18,14 +18,22 @@ products = [
     Product(id=8, name="Table", description="A wooden table", price=199.99, quantity=20),
 ]
 
+#  to add the products in the db
+def init_db():
+    db=session();
+    for product in products:
+        db.add(database_models.Product(**product.model_dump()))
+    db.commit()
+init_db()
+
 # to fetch all products, GET request
 @app.get("/products")    #use localhost:8000/docs- for swagger (to execute within an inbuilt ui provided by fastapi)
 def get_products():
     
     #db_connection
-    db = session()
-    #query
-    db.query()
+    # db = session()
+    # #query
+    # db.query()
     return products
 
 # to fetch product by id
