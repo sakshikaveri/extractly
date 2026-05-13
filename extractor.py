@@ -1,17 +1,19 @@
-# main.py calls this, This file does not know anything about HTTP or FastAPI, same idea as Service layer in Spring Boot.
+
+# main.py calls this. This file does not know anything about HTTP or FastAPI, same idea as Service layer in Spring Boot.
 
 import os
 import json
-from openai import OpenAI
+import re
+
 from dotenv import load_dotenv
+from groq import Groq
+from typing import Optional, List
 
-load_dotenv()  # this reads your .env file and loads the variables
 
-# OpenAI client — reads the API key from environment variable
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv()  # reads your .env file and loads the variables
 
-# Each extract type has a predefined set of fields
-# This way the user just says "invoice" and we know exactly what to ask for.
+
+# Each extract type has a predefined set of fields we want to pull out.
 FIELD_MAP = {
     "invoice": [
         "vendor_name",
@@ -20,7 +22,7 @@ FIELD_MAP = {
         "due_date",
         "total_amount",
         "currency",
-        "line_items",      # list of items with name, quantity, price
+        "line_items",
         "tax_amount",
         "payment_terms"
     ],
@@ -29,14 +31,14 @@ FIELD_MAP = {
         "sender_email",
         "subject",
         "main_request_or_topic",
-        "action_items",    # list of things the sender wants to be done
-        "urgency",         # high / medium / low
+        "action_items",
+        "urgency",
         "key_dates_mentioned"
     ],
     "receipt": [
         "store_name",
         "purchase_date",
-        "items_purchased",  # list of items with name and price
+        "items_purchased",
         "subtotal",
         "tax",
         "total",
@@ -45,22 +47,18 @@ FIELD_MAP = {
 }
 
 
-def build_prompt(text: str, extract_type: str, custom_fields: list[str] | None) -> str:
-    """
-    Build the prompt we send to OpenAI.
-    The prompt tells OpenAI exactly what we want and in what format.
-    """
-
-    # Figure out which fields to extract
+def build_prompt(text: str, extract_type: str, custom_fields: Optional[List[str]]) -> str:
     if extract_type == "custom":
         fields = custom_fields
     else:
-        fields = FIELD_MAP[extract_type]
+        fields = FIELD_MAP.get(extract_type)
 
-    # Convert fields list to a readable string for the prompt
+        if not fields:
+            raise ValueError(f"Unsupported extract type: {extract_type}")
+
     fields_str = "\n".join(f"- {field}" for field in fields)
 
-    prompt = f"""You are a data extraction assistant. 
+    prompt = f"""You are a data extraction assistant.
 Extract the following fields from the text below.
 
 FIELDS TO EXTRACT:
@@ -80,41 +78,36 @@ Return JSON only:"""
     return prompt
 
 
-def extract_data(text: str, extract_type: str, custom_fields: list[str] | None) -> dict:
-    """
-    Sends the text to OpenAI and returns the structured extracted data.
-    This is the core function of the whole project.
-    """
-
-    # Step 1 - Build the prompt
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+def extract_data(text: str, extract_type: str, custom_fields: Optional[List[str]]) -> dict:
+    # Build the prompt
     prompt = build_prompt(text, extract_type, custom_fields)
 
-    # Step 2: Call OpenAI
-    # We use response_format={"type": "json_object"} to force JSON output
-    # This is OpenAI's structured output mode — no more parsing markdown fences
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",     # cheap and fast, good enough for extraction
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a precise data extraction assistant. Always return valid JSON only."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        response_format={"type": "json_object"},  # forces JSON response
-        temperature=0  # 0 = deterministic, we want consistent extraction not creativity - Same input → same output
-    )
+    # Call Groq
+    response = groq_client.chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+    temperature=0,
+    response_format={"type": "json_object"}
+)
 
-    # Step 3: Parse the JSON string OpenAI returned
+    # Get raw text
     raw_json = response.choices[0].message.content
 
-    # Step 4: Convert JSON string to Python dict
-    parsed = json.loads(raw_json)
+    
 
-    # Step 5: Pull out confidence separately, remove it from extracted data
+    # Clean markdown fences if present
+    clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_json.strip())
+
+    # Parse JSON
+    parsed = json.loads(clean)
+
+    # Pull out confidence
     confidence = parsed.pop("confidence", "medium")
 
     return {
